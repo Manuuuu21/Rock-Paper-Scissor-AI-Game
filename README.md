@@ -2,6 +2,9 @@
 
 A simple browser-based Rock Paper Scissors game powered by a neural network that learns to predict and counter your moves. This project is built entirely using **HTML**, **CSS**, and **JavaScript** — no external libraries required!
 
+# TRY IT HERE
+https://manuuuu21.github.io/Rock-Paper-Scissor-AI-Game/
+
 ---
 
 ## 💡 How It Works
