@@ -1,0 +1,434 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neural Network Rock Paper Scissors</title>
+  <style>
+     body {
+      font-family: 'Roboto', sans-serif;
+      background: #f5f5f5;
+      padding: 0px 40px 0px 40px;
+      text-align: center;
+    }
+
+    h2 {
+      color: #333;
+      margin-bottom: 30px;
+    }
+
+    .btn {
+      background: #6200ea;
+      color: white;
+      padding: 12px 24px;
+      margin: 10px;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
+      transition: background 0.3s, box-shadow 0.2s;
+    }
+
+    .btn:hover {
+      background: #3700b3;
+      box-shadow: 0 5px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .btn:active {
+      background: #30009c;
+    }
+
+    #result, #stats {
+      font-size: 18px;
+      margin-top: 20px;
+      color: #444;
+    }
+
+    canvas {
+      margin-top: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+    <h2>Rock Paper Scissors (Neural Network)</h2>
+    <button onclick="startAutoplayAI()">Start AI vs AI: Learn by playing itself</button>
+    <button onclick="stopAutoplayAI()">Stop AI vs AI</button><br/><br/><hr/><br/>
+
+    <button onclick="play(0)">Rock</button>
+    <button onclick="play(1)">Paper</button>
+    <button onclick="play(2)">Scissors</button>
+
+    <p id="result">Choose a move!</p>
+    <p id="stats"></p>
+    <p id="winner"></p>
+
+    <canvas id="networkCanvas" width="700" height="500"></canvas>
+
+    <script>
+        /* This is the special code that makes the "brain" work! */
+        /* Think of this like building a team of little helper brains */
+        class NeuralNetwork {
+
+            /* This is like the team captain setting up the team */
+            /* It decides how many little brains are in each row and how they learn */
+            constructor(inputNodes, hiddenNodes1, hiddenNodes2, outputNodes, learningRate = 1.0) {
+                /* How many little brains in the first row (for your move) */
+                this.inputNodes = inputNodes;
+
+                /* How many little brains in the first middle row (the first thinking part) */
+                this.hiddenNodes1 = hiddenNodes1;
+
+                /* How many little brains in the second middle row (the second thinking part) */
+                this.hiddenNodes2 = hiddenNodes2;
+
+                /* How many little brains in the last row (for the computer's move) */
+                this.outputNodes = outputNodes;
+
+                /* How fast the team learns from mistakes (like practicing!) */
+                this.learningRate = learningRate;
+
+                /* These are the connections between the first and first hidden row of brains */
+                this.weightsInputHidden1 = this.initWeights(inputNodes, hiddenNodes1);
+
+                /* These are the connections between the first hidden and second hidden row of brains */
+                this.weightsHidden1Hidden2 = this.initWeights(hiddenNodes1, hiddenNodes2);
+
+                /* These are the connections between the second hidden and last row of brains */
+                this.weightsHidden2Output = this.initWeights(hiddenNodes2, outputNodes);
+            }
+
+            /* This is how we set up those connections (wires) at the very beginning */
+            /* We give them random strengths, like guessing how strong each wire should be */
+            initWeights(rows, cols) {
+                const weights = []; // A list to hold all the wire strengths
+                for (let i = 0; i < rows; i++) { // Go through each little brain in the first row
+                    weights[i] = []; // Make a list for the wires coming from this brain
+                    for (let j = 0; j < cols; j++) { // Go through each little brain in the next row
+                        // Give the wire a random strength (can be positive or negative)
+                        weights[i][j] = Math.random() * 2 - 1;
+                    }
+                }
+                return weights; // Give back the list of all wire strengths
+            }
+
+            /* This is a special math trick (like a secret code) that helps the brains decide */
+            /* It squishes numbers between 0 and 1 */
+            sigmoid(x) {
+                return 1 / (1 + Math.exp(-x));
+            }
+
+            /* This is another math trick used when the team is learning */
+            sigmoidDerivative(x) {
+                return x * (1 - x);
+            }
+
+            /* This is how messages travel from one row of brains to the next */
+            /* It's like adding up all the messages coming in through the wires */
+            dot(a, b) {
+                const result = []; // A list to hold the messages for the next row
+                for (let j = 0; j < b[0].length; j++) { // Go through each brain in the next row
+                    let sum = 0; // Start with no message
+                    for (let i = 0; i < a.length; i++) { // Go through each brain in the first row
+                        // Add up the message from the first brain multiplied by the wire strength
+                        sum += a[i] * b[i][j];
+                    }
+                    result[j] = sum; // Put the total message in the list for the next row
+                }
+                return result; // Give back the list of messages for the next row
+            }
+
+            /* This is how the team thinks! Messages go from the input brains, through the hidden brains, to the output brains */
+            feedforward(input) {
+                this.input = input; // Remember the message that came in (your move)
+
+                /* Messages go from input to first hidden brains, then use the secret code (sigmoid) */
+                this.hidden1 = this.dot(input, this.weightsInputHidden1).map(this.sigmoid);
+
+                /* Messages go from first hidden to second hidden brains, then use the secret code (sigmoid) */
+                this.hidden2 = this.dot(this.hidden1, this.weightsHidden1Hidden2).map(this.sigmoid);
+
+                /* Messages go from second hidden to output brains, then use the secret code (sigmoid) */
+                this.output = this.dot(this.hidden2, this.weightsHidden2Output).map(this.sigmoid);
+                return this.output; // Give back the final message (the computer's move idea)
+            }
+
+            /* This is how the team practices and learns from its mistakes! */
+            train(input, target) {
+                // First, let the team think with the current wires (feedforward)
+                this.feedforward(input);
+
+                // Figure out how wrong the final answer was (like checking the score)
+                const outputErrors = target.map((t, i) => t - this.output[i]);
+
+                // Figure out how much each second hidden brain contributed to the mistake
+                const hidden2Errors = [];
+                for (let i = 0; i < this.hiddenNodes2; i++) {
+                    let error = 0;
+                    for (let j = 0; j < this.outputNodes; j++) {
+                        // Add up the mistake from the end brains, considering the wire strengths
+                        error += outputErrors[j] * this.weightsHidden2Output[i][j];
+                    }
+                    hidden2Errors[i] = error;
+                }
+
+                // Figure out how much each first hidden brain contributed to the mistake
+                const hidden1Errors = [];
+                for (let i = 0; i < this.hiddenNodes1; i++) {
+                    let error = 0;
+                    for (let j = 0; j < this.hiddenNodes2; j++) {
+                        // Add up the mistake from the second hidden brains, considering the wire strengths
+                        error += hidden2Errors[j] * this.weightsHidden1Hidden2[i][j];
+                    }
+                    hidden1Errors[i] = error;
+                }
+
+                // Now, fix the wires between the second hidden and last brains based on the mistakes
+                for (let i = 0; i < this.hiddenNodes2; i++) {
+                    for (let j = 0; j < this.outputNodes; j++) {
+                        // Calculate how much to change the wire strength (using the secret code and learning speed)
+                        const delta = outputErrors[j] * this.sigmoidDerivative(this.output[j]) * this.hidden2[i];
+                        // Change the wire strength a little bit to be better next time
+                        this.weightsHidden2Output[i][j] += this.learningRate * delta;
+                    }
+                }
+
+                // Fix the wires between the first hidden and second hidden brains based on the mistakes
+                for (let i = 0; i < this.hiddenNodes1; i++) {
+                    for (let j = 0; j < this.hiddenNodes2; j++) {
+                        // Calculate how much to change this wire's strength
+                        const delta = hidden2Errors[j] * this.sigmoidDerivative(this.hidden2[j]) * this.hidden1[i];
+                        // Change the wire strength a little bit
+                        this.weightsHidden1Hidden2[i][j] += this.learningRate * delta;
+                    }
+                }
+
+                // Finally, fix the wires between the first and first hidden brains based on the mistakes
+                for (let i = 0; i < this.inputNodes; i++) {
+                    for (let j = 0; j < this.hiddenNodes1; j++) {
+                        // Calculate how much to change this wire's strength
+                        const delta = hidden1Errors[j] * this.sigmoidDerivative(this.hidden1[j]) * this.input[i];
+                        // Change the wire strength a little bit
+                        this.weightsInputHidden1[i][j] += this.learningRate * delta;
+                    }
+                }
+            }
+
+            selfTrain({ epochs, data }) {
+                for (let i = 0; i < epochs; i++) {
+                    for (let trainingData of data) {
+                        this.train(trainingData.input, trainingData.target);
+                    }
+                }
+            }
+        }
+
+        /* Setting up how many brains are in each row for our game */
+        const inputNodes = 3; // One brain for Rock, Paper, and Scissors
+        const hiddenNodes1 = 15; // First hidden layer
+        const hiddenNodes2 = 15;  // Second hidden layer (new)
+        const outputNodes = 3; // One brain for the computer to choose Rock, Paper, or Scissors
+
+        /* Creating our special brain team! */
+        const nn = new NeuralNetwork(inputNodes, hiddenNodes1, hiddenNodes2, outputNodes);
+
+        /* This is the practice data! We show the brain what happens: */
+        /* If you play Rock (1,0,0), the computer should learn to play Paper (0,1,0) */
+        /* If you play Paper (0,1,0), the computer should learn to play Scissors (0,0,1) */
+        /* If you play Scissors (0,0,1), the computer should learn to play Rock (1,0,0) */
+        const training_Data = [
+            { input: [1, 0, 0], target: [0, 1, 0] }, // Rock should lose to Paper
+            { input: [0, 1, 0], target: [0, 0, 1] }, // Paper should lose to Scissors
+            { input: [0, 0, 1], target: [1, 0, 0] }, // Scissors should lose to Rock
+        ];
+
+        // Lets give the AI a practice game many times! before fighting us in Rock, Paper, scissor game
+        // Note: YOU CAN THIS TO 0. AND USE THE LEARN TO PLAY ITSELF TO BECOME A BETTER OPPONENT
+        const numbersOfGame = 0;
+        nn.selfTrain({ epochs: numbersOfGame, data: training_Data });
+
+        /* This function runs when you click one of the buttons */
+        function play(playerMove) {
+            const input = [0, 0, 0];
+            input[playerMove] = 1;
+
+            const output = nn.feedforward(input);
+            const moves = ['Rock', 'Paper', 'Scissors'];
+            const aiMoveIndex = output.indexOf(Math.max(...output));
+            const predictedMove = moves[aiMoveIndex];
+
+            document.getElementById('result').innerText =`You chose: ${moves[playerMove]}, Neural Network's move: ${predictedMove}`;
+                
+            // Determine the winner
+            let winnerText = '';
+            if (playerMove === aiMoveIndex) {
+                winnerText = "It's a tie!";
+            } else if (
+                (playerMove === 0 && aiMoveIndex === 2) || // Rock beats Scissors
+                (playerMove === 1 && aiMoveIndex === 0) || // Paper beats Rock
+                (playerMove === 2 && aiMoveIndex === 1)    // Scissors beats Paper
+            ) {
+                winnerText = "You win!";
+            } else {
+                winnerText = "Neural Network wins!";
+            }
+
+            document.getElementById('winner').innerText = winnerText;
+
+            drawNetwork(input, nn.hidden1, nn.hidden2, output);
+        }
+
+
+        // Draws the entire neural network on the canvas
+        function drawNetwork(input, hidden1, hidden2, output) {
+            const canvas = document.getElementById('networkCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const nodeRadius = 15;
+            const nodeGap = 40; // Vertical gap between nodes
+            const layerGap = 160; // Horizontal gap between layers
+
+            // Calculate starting Y for centering layers vertically
+            const getStartY = count => (canvas.height - ((count - 1) * nodeGap)) / 2;
+
+            // Define layer positions
+            const inputLayer = { x: 100, y: getStartY(input.length), nodes: input };
+            const hidden1Layer = { x: inputLayer.x + layerGap, y: getStartY(hidden1.length), nodes: hidden1 };
+            const hidden2Layer = { x: hidden1Layer.x + layerGap, y: getStartY(hidden2.length), nodes: hidden2 };
+            const outputLayer = { x: hidden2Layer.x + layerGap, y: getStartY(output.length), nodes: output };
+
+            // Draw layers
+            drawLayer(ctx, inputLayer, nodeRadius, nodeGap);
+            drawLayer(ctx, hidden1Layer, nodeRadius, nodeGap);
+            drawLayer(ctx, hidden2Layer, nodeRadius, nodeGap);
+            drawLayer(ctx, outputLayer, nodeRadius, nodeGap);
+
+            // Draw connections
+            drawConnections(ctx, inputLayer, hidden1Layer, nn.weightsInputHidden1, nodeGap);
+            drawConnections(ctx, hidden1Layer, hidden2Layer, nn.weightsHidden1Hidden2, nodeGap);
+            drawConnections(ctx, hidden2Layer, outputLayer, nn.weightsHidden2Output, nodeGap);
+        }
+
+        // Draws a single layer of neurons (nodes)
+        function drawLayer(ctx, layer, nodeRadius, nodeGap) {
+            for (let i = 0; i < layer.nodes.length; i++) {
+                const nodeValue = layer.nodes[i];
+                const nodeX = layer.x;
+                const nodeY = layer.y + i * nodeGap;
+
+                // Draw circle representing the node
+                ctx.beginPath();
+                ctx.arc(nodeX, nodeY, nodeRadius, 0, 2 * Math.PI);
+                ctx.fillStyle = `rgba(0, 0, 255, ${nodeValue})`; // Blue color based on activation
+                ctx.fill();
+                ctx.strokeStyle = '#333'; // Node border color
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // Draw node value text
+                ctx.fillStyle = 'black';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = '10px Arial';
+                ctx.fillText(nodeValue.toFixed(2), nodeX, nodeY);
+            }
+        }
+
+        // Draws connections between two layers
+        function drawConnections(ctx, layer1, layer2, weights, nodeGap) {
+            for (let i = 0; i < layer1.nodes.length; i++) {
+                for (let j = 0; j < layer2.nodes.length; j++) {
+                    const startX = layer1.x;
+                    const startY = layer1.y + i * nodeGap;
+                    const endX = layer2.x;
+                    const endY = layer2.y + j * nodeGap;
+
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+
+                    // Line color and thickness based on absolute weight value
+                    const weightStrength = Math.abs(weights[i][j]);
+                    ctx.strokeStyle = `rgba(0, 0, 0, ${weightStrength * 0.8})`; // Darker for stronger weights
+                    ctx.lineWidth = 1; // Thicker for stronger weights
+
+                    ctx.stroke();
+                }
+            }
+        }
+
+
+        // We're going to make the AI play against itself over and over
+        let autoplayInterval = null; // This will help us start and stop the game loop
+        let totalGuesses = 0;        // How many times the AI has tried to guess the move
+        let correctGuesses = 0;      // How many times the AI got it right
+
+        // This function makes the AI play automatically (like it's playing by itself)
+        function startAutoplayAI() {
+            // If it's already running, don't start again
+            if (autoplayInterval) return;
+
+            // Start doing this every 16 milliseconds (really fast!)
+            autoplayInterval = setInterval(() => {
+                // Pretend a player chose Rock, Paper, or Scissors randomly
+                const simulatedMove = Math.floor(Math.random() * 3);
+
+                // Make an input array for the neural network (only one 1, others 0)
+                const input = [0, 0, 0];
+                input[simulatedMove] = 1;
+
+                // Ask the AI what it thinks the player will play
+                const output = nn.feedforward(input);
+
+                // Find which move the AI thinks is best (the highest number)
+                const predictedMove = output.indexOf(Math.max(...output));
+
+                // AI tries to win by choosing the move that beats the predicted one
+                // For example, if AI thinks player will pick Rock (0), it picks Paper (1)
+                const aiMove = (predictedMove + 1) % 3;
+
+                // Teach the AI the correct answer (how to beat the simulated move)
+                const target = [0, 0, 0];
+                target[(simulatedMove + 1) % 3] = 1; // Target is the move that beats simulatedMove
+                nn.train(input, target);
+
+                // Check if the AI picked the right winning move
+                // The AI's 'predictedMove' should ideally be the one that 'simulatedMove' loses to.
+                // So if simulatedMove is Rock (0), AI should predict Paper (1).
+                // If AI's actual move (aiMove) is the one that beats the simulatedMove, then it's a correct guess.
+                if (aiMove === (simulatedMove + 1) % 3) {
+                    correctGuesses++;
+                }
+                totalGuesses++;
+
+                // Show how smart the AI is getting
+                updateStats();
+
+                // Show the brain and how it’s thinking
+                drawNetwork(input, nn.hidden1, nn.hidden2, output);
+            }, 16); // This means do it really fast (60 times every second)
+        }
+
+        // This stops the AI from playing against itself
+        function stopAutoplayAI() {
+            clearInterval(autoplayInterval); // Stop the repeated game loop
+            autoplayInterval = null;         // Reset it so we know it's stopped
+        }
+
+        // This function shows how good the AI is at guessing
+        function updateStats() {
+            const accuracy = (correctGuesses / totalGuesses * 100).toFixed(2);
+            document.getElementById('stats').innerText =
+                `AI Accuracy to Predict Bad Moves: ${accuracy}% (${correctGuesses}/${totalGuesses})`;
+        }
+
+        // When the page first opens, draw an empty brain with no thinking yet
+        // Initialize with dummy data for drawing
+        drawNetwork([0, 0, 0], Array(nn.hiddenNodes1).fill(0), Array(nn.hiddenNodes2).fill(0), [0, 0, 0]);
+    </script>
+</body>
+</html>
